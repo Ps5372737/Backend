@@ -1,0 +1,61 @@
+project/
+├── main.go                  # Entry point
+├── config                   # Configuration files (DB, app config)
+├── controllers              # Handlers for API endpoints
+├── models                   # Data models (User, Patient, etc.)
+├── repositories             # Database interactions (CRUD)
+├── routes                   # Route definitions
+├── services                 # Business logic (auth, patient management)
+├── middlewares              # JWT, role-based access control (RBAC)
+├── migrations               # Database migrations
+├── utils                    # Helper functions (e.g., hashing, error handling)
+├── docs                     # Swagger or Postman API documentation
+└── tests                    # Unit and integration tests
+type User struct {
+    ID       uint   `json:"id"`
+    Username string `json:"username"`
+    Password string `json:"-"`
+    Role     string `json:"role"` // "receptionist" or "doctor"
+}
+
+type Patient struct {
+    ID        uint   `json:"id"`
+    Name      string `json:"name"`
+    Age       int    `json:"age"`
+    Condition string `json:"condition"`
+    DoctorID  uint   `json:"doctor_id"` // Optional, linked to doctor
+}
+func CreatePatient(w http.ResponseWriter, r *http.Request) {
+    // Extract data, validate, insert into DB
+}
+
+func UpdatePatient(w http.ResponseWriter, r *http.Request) {
+    // Check authorization, update patient record
+}
+func RoleMiddleware(next http.Handler, role string) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        userRole := getUserRoleFromContext(r.Context())
+        if userRole != role {
+            http.Error(w, "Forbidden", http.StatusForbidden)
+            return
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+func SetupRoutes() {
+    router := http.NewServeMux()
+
+    // Auth
+    router.HandleFunc("/login", Login)
+
+    // Receptionist routes (with role-based middleware)
+    router.Handle("/patients", RoleMiddleware(http.HandlerFunc(CreatePatient), "receptionist"))
+    router.Handle("/patients/{id}", RoleMiddleware(http.HandlerFunc(UpdatePatient), "receptionist"))
+
+    // Doctor routes
+    router.Handle("/patients", RoleMiddleware(http.HandlerFunc(GetPatients), "doctor"))
+    router.Handle("/patients/{id}", RoleMiddleware(http.HandlerFunc(GetPatient), "doctor"))
+
+    // Start server
+    http.ListenAndServe(":8080", router)
+}
